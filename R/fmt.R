@@ -16,6 +16,81 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#' Round half away from zero
+#'
+#' Round numeric values to a given number of decimal places, with decimal
+#' ties (e.g., 2.25 at `digits = 1`) rounded half away from zero
+#' (i.e., 2.25 becomes 2.3 and -2.25 becomes -2.3). This follows the
+#' `roundSAS` algorithm from `pharmaverse/tidytlg` and therefore differs
+#' from base R `round()`, which rounds ties to an even digit.
+#' Values that round to zero (including small negative values) return
+#' positive zero, so formatted output never shows negative zero.
+#'
+#' @param x A numeric vector, matrix, or data frame.
+#' @param digits Number of decimal places.
+#'
+#' @return An object of the same shape as `x` with rounded values.
+#'
+#' @export
+#'
+#' @examples
+#' round_half_away_from_zero(c(2.25, 2.35, -2.25), digits = 1)
+round_half_away_from_zero <- function(x, digits = 0) {
+  if (is.data.frame(x)) {
+    x[] <- lapply(x, function(col) round_half_away_from_zero(col, digits = digits))
+    return(x)
+  }
+
+  d <- dim(x)
+  dn <- dimnames(x)
+
+  posneg <- sign(x)
+  z <- abs(x) * 10^digits
+  z <- z + 0.5 + sqrt(.Machine$double.eps)
+  z <- trunc(z)
+  z <- z / 10^digits
+  z <- ifelse(!is.na(z) & z > 0, z * posneg, z)
+
+  dim(z) <- d
+  dimnames(z) <- dn
+
+  z
+}
+
+#' Format a number with fixed decimals
+#'
+#' Round with [round_half_away_from_zero()] (decimal ties go half away
+#' from zero) and format with fixed decimal places. The result never
+#' displays negative zero: values rounding to zero format as `"0.0"`,
+#' not `"-0.0"`.
+#'
+#' @param x A numeric vector.
+#' @param digits Number of digits.
+#' @param width Width of each column (passed to `formatC()`).
+#'
+#' @return A character vector with the expected format.
+#'
+#' @export
+#'
+#' @examples
+#' format_number(c(2.25, -0.001, NA), digits = 1)
+format_number <- function(x, digits = 1, width = NULL) {
+  x <- round_half_away_from_zero(x, digits = digits)
+
+  out <- if (is.null(width)) {
+    formatC(x, digits = digits, format = "f")
+  } else {
+    formatC(x, digits = digits, format = "f", width = width)
+  }
+
+  # Belt-and-braces safeguard against negative zero strings (e.g., "-0.0",
+  # including width-padded variants such as " -0.0").
+  is_neg_zero <- !is.na(out) & grepl("^\\s*-0(\\.0*)?\\s*$", out)
+  out[is_neg_zero] <- gsub("-", "", out[is_neg_zero], fixed = TRUE)
+
+  out
+}
+
 #' Format percentage
 #'
 #' @param x A numeric vector.
@@ -30,7 +105,7 @@
 #' @examples
 #' fmt_pct(c(1, 1.52, 0.3, 100))
 fmt_pct <- function(x, digits = 1, pre = "(", post = ")") {
-  x1 <- ifelse(is.na(x), x, formatC(x, digits = digits, format = "f"))
+  x1 <- ifelse(is.na(x), x, format_number(x, digits = digits))
 
   x2 <- ifelse(is.na(x1), x1, paste0(pre, x1, post))
 
@@ -72,11 +147,11 @@ fmt_est <- function(mean,
                     sd = rep(NA, length(mean)),
                     digits = c(1, 1),
                     width = c(4, 3) + digits) {
-  .mean <- ifelse(is.na(mean), mean, formatC(mean, digits = digits[1], format = "f", width = width[1]))
+  .mean <- ifelse(is.na(mean), mean, format_number(mean, digits = digits[1], width = width[1]))
   ifelse(is.na(sd),
     .mean,
     {
-      .sd <- formatC(sd, digits = digits[2], format = "f", width = width[2])
+      .sd <- format_number(sd, digits = digits[2], width = width[2])
       paste0(.mean, " (", .sd, ")")
     }
   )
@@ -96,8 +171,8 @@ fmt_est <- function(mean,
 #' @examples
 #' fmt_ci(0.2356, 0.3871)
 fmt_ci <- function(lower, upper, digits = 2, width = 3 + digits) {
-  .lower <- formatC(lower, digits = digits, format = "f", width = width)
-  .upper <- formatC(upper, digits = digits, format = "f", width = width)
+  .lower <- format_number(lower, digits = digits, width = width)
+  .upper <- format_number(upper, digits = digits, width = width)
 
   ifelse(is.na(lower), NA, paste0("(", .lower, ", ", .upper, ")"))
 }
@@ -119,6 +194,6 @@ fmt_pval <- function(p, digits = 3, width = 3 + digits) {
   p_scale <- paste0("<", scale)
   ifelse(p < scale,
     p_scale,
-    formatC(p, digits = digits, format = "f", width = width)
+    format_number(p, digits = digits, width = width)
   )
 }
