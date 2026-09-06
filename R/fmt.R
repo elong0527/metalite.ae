@@ -16,25 +16,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#' Round half away from zero
-#'
-#' Round numeric values to a given number of decimal places, with decimal
-#' ties (e.g., 2.25 at `digits = 1`) rounded half away from zero
-#' (i.e., 2.25 becomes 2.3 and -2.25 becomes -2.3). This follows the
-#' `roundSAS` algorithm from `pharmaverse/tidytlg` and therefore differs
-#' from base R `round()`, which rounds ties to an even digit.
-#' Values that round to zero (including small negative values) return
-#' positive zero, so formatted output never shows negative zero.
-#'
-#' @param x A numeric vector, matrix, or data frame.
-#' @param digits Number of decimal places.
-#'
-#' @return An object of the same shape as `x` with rounded values.
-#'
-#' @export
-#'
-#' @examples
-#' round_half_away_from_zero(c(2.25, 2.35, -2.25), digits = 1)
+# Internal helper: round half away from zero.
+#
+# Rounds numeric values to a given number of decimal places, with decimal
+# ties (e.g., 2.25 at `digits = 1`) rounded half away from zero
+# (i.e., 2.25 becomes 2.3 and -2.25 becomes -2.3). This follows the
+# `roundSAS` algorithm from `pharmaverse/tidytlg` and therefore differs
+# from base R `round()`, which rounds ties to an even digit.
+# Values that round to zero (including small negative values) return
+# positive zero, so formatted output never shows negative zero.
 round_half_away_from_zero <- function(x, digits = 0) {
   if (is.data.frame(x)) {
     x[] <- lapply(x, function(col) round_half_away_from_zero(col, digits = digits))
@@ -57,23 +47,12 @@ round_half_away_from_zero <- function(x, digits = 0) {
   z
 }
 
-#' Format a number with fixed decimals
-#'
-#' Round with [round_half_away_from_zero()] (decimal ties go half away
-#' from zero) and format with fixed decimal places. The result never
-#' displays negative zero: values rounding to zero format as `"0.0"`,
-#' not `"-0.0"`.
-#'
-#' @param x A numeric vector.
-#' @param digits Number of digits.
-#' @param width Width of each column (passed to `formatC()`).
-#'
-#' @return A character vector with the expected format.
-#'
-#' @export
-#'
-#' @examples
-#' format_number(c(2.25, -0.001, NA), digits = 1)
+# Internal helper: format a number with fixed decimals.
+#
+# Rounds with `round_half_away_from_zero()` (decimal ties go half away
+# from zero) and formats with fixed decimal places. The result never
+# displays negative zero: values rounding to zero format as `"0.0"`,
+# not `"-0.0"`.
 format_number <- function(x, digits = 1, width = NULL) {
   x <- round_half_away_from_zero(x, digits = digits)
 
